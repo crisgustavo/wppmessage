@@ -1,5 +1,4 @@
 import { sessions } from './sessionController.js';
-import fs from 'fs';
 
 class MessageController {
   async sendMessage(req, res) {
@@ -7,9 +6,7 @@ class MessageController {
 
     const session = sessions.get(sessionId);
     if (!session) return res.status(400).json({ error: 'SESSION_NOT_FOUND' });
-
-    const sock = session.sock;
-    if (!sock || !session.connected)
+    if (!session.sock || !session.connected)
       return res.status(400).json({ error: 'NOT_CONNECTED' });
 
     const jid = number + '@s.whatsapp.net';
@@ -41,9 +38,11 @@ class MessageController {
 
       await session.sock.sendMessage(jid, msg);
 
+      // log simplificado
+      console.log(`Mensagem enviada para ${jid}`);
       return res.json({ status: 'SENT' });
     } catch (err) {
-      console.error('Erro ao enviar mensagem:', err);
+      console.error(`Erro ao enviar mensagem para ${jid}:`, err.message);
       return res
         .status(500)
         .json({ error: 'SEND_FAILED', details: err.message });

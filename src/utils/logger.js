@@ -1,21 +1,31 @@
-import pino from 'pino';
-import moment from 'moment-timezone';
+import P from 'pino';
 
-const timezoned = () => {
-  return moment().tz('America/Sao_Paulo').format('DD-MM-YYYY HH:mm:ss');
-};
-
-const logger = pino({
+export const logger = P({
+  level: 'fatal',
   transport: {
     target: 'pino-pretty',
-    options: {
-      colorize: true,
-      levelFirst: true,
-      translateTime: 'SYS:dd-mm-yyyy HH:MM:ss',
-      ignore: 'pid,hostname',
-    },
+    options: { colorize: true },
   },
-  timestamp: () => `,"time":"${timezoned()}"`,
 });
 
-export default logger;
+export const silentLogger = P({
+  level: 'silent',
+  transport: undefined,
+});
+
+export const emptyLogger = {
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  fatal: () => {},
+  child: () => ({
+    trace: () => {},
+    debug: () => {},
+    info: () => {},
+    warn: () => {},
+    error: () => {},
+    fatal: () => {},
+  }),
+};

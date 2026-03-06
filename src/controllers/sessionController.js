@@ -8,17 +8,15 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 
 import QRCode from 'qrcode';
-import P from 'pino';
 
 import { useRedisAuthState, clearSession } from '../libs/redisAuth.js';
+import { logger } from '../utils/logger.js';
 
 export const sessions = new Map();
 
 class SessionController {
   async buildSession(sessionId) {
-    if (sessions.has(sessionId)) {
-      return sessions.get(sessionId);
-    }
+    if (sessions.has(sessionId)) return sessions.get(sessionId);
 
     console.log(`🚀 Criando sessão: ${sessionId}`);
 
@@ -29,7 +27,7 @@ class SessionController {
       const sock = makeWASocket({
         version,
         auth: state,
-        logger: P({ level: 'silent' }),
+        logger: logger,
         browser: Browsers.windows('Desktop'),
       });
 
@@ -38,6 +36,7 @@ class SessionController {
         qr: null,
         connected: false,
         jid: null,
+        jidNumber: null,
       };
 
       sessions.set(sessionId, session);
@@ -47,13 +46,11 @@ class SessionController {
       sock.ev.on('connection.update', async (update) => {
         const { connection, qr, lastDisconnect } = update;
         const session = sessions.get(sessionId);
-
         if (!session) return;
 
         if (qr) {
           session.qr = await QRCode.toDataURL(qr);
-
-          console.log(`📱 QR ${sessionId}`);
+          console.log(`📱 QR gerado para ${sessionId}`);
         }
 
         if (connection === 'open') {
@@ -62,84 +59,53 @@ class SessionController {
           session.jid = sock.user.id;
           session.jidNumber = sock.user.id.split(':')[0];
 
-          console.log(`✅ Conectado: ${sessionId}`);
-          console.log(`JID: ${session.jid}`);
+          console.log(`✅ Sessão conectada: ${sessionId}`);
         }
 
         if (connection === 'close') {
           const statusCode = lastDisconnect?.error?.output?.statusCode;
-
-          console.log(`❌ Conexão fechada ${sessionId} -> ${statusCode}`);
-
           session.connected = false;
 
           if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
-            console.log(`🚫 Logout detectado`);
-
+            console.log(`🚫 Logout detectado em ${sessionId}`);
             await clearSession(sessionId);
-
             sessions.delete(sessionId);
-
-            setTimeout(() => {
-              this.buildSession(sessionId);
-            }, 2000);
-
+            setTimeout(() => this.buildSession(sessionId), 2000);
             return;
           }
 
           if (statusCode === DisconnectReason.connectionReplaced) {
-            console.log(`⚠ Conexão substituída`);
+            console.log(`⚠ Conexão substituída em ${sessionId}`);
             return;
           }
 
           console.log(`🔄 Reconectando ${sessionId}`);
-
           sessions.delete(sessionId);
-
-          setTimeout(() => {
-            this.buildSession(sessionId);
-          }, 3000);
+          setTimeout(() => this.buildSession(sessionId), 3000);
         }
       });
 
-      sock.ev.on('messages.update', (updates) => {
-        updates.forEach((u) => {
-          const session = sessions.get(sessionId);
-          if (!session) return;
-
-          console.log(
-            `Mensagem ${u.key.id} para ${u.key.remoteJid} atualizada:`,
-            u,
-          );
-        });
+      // Evita logs enormes, não imprime nada das mensagens
+      sock.ev.on('messages.update', () => {
+        /* nada aqui */
       });
 
       return session;
     } catch (err) {
-      console.error('Erro sessão:', err);
-
-      setTimeout(() => {
-        this.buildSession(sessionId);
-      }, 5000);
+      console.error('Erro ao criar sessão:', err);
+      setTimeout(() => this.buildSession(sessionId), 5000);
     }
   }
 
   async initSession(req, res) {
     const { sessionId } = req.body;
-
-    if (!sessionId) {
-      return res.status(400).json({ error: 'SESSION_REQUIRED' });
-    }
+    if (!sessionId) return res.status(400).json({ error: 'SESSION_REQUIRED' });
 
     const session = sessions.get(sessionId);
-
-    if (session?.connected) {
+    if (session?.connected)
       return res.json({ status: 'CONNECTED', jid: session.jid });
-    }
 
-    if (!session) {
-      await this.buildSession(sessionId);
-    }
+    if (!session) await this.buildSession(sessionId);
 
     return res.json({ status: 'CREATING_QR' });
   }
@@ -147,19 +113,11 @@ class SessionController {
   async getQR(req, res) {
     const { sessionId } = req.body;
     const session = sessions.get(sessionId);
+    if (!session) return res.status(404).json({ error: 'SESSION_NOT_FOUND' });
 
-    if (!session) {
-      return res.status(404).json({ error: 'SESSION_NOT_FOUND' });
-    }
+    if (!session.qr) return res.json({ status: 'NO_QR' });
 
-    if (!session.qr) {
-      return res.json({ status: 'NO_QR' });
-    }
-
-    return res.json({
-      status: 'QRCODE',
-      qr: session.qr,
-    });
+    return res.json({ status: 'QRCODE', qr: session.qr });
   }
 
   async checkConnection(req, res) {
@@ -170,7 +128,7 @@ class SessionController {
       connected: session?.connected || false,
       jid: session?.jid || null,
       hasQR: !!session?.qr,
-      jidNumber: session.jidNumber || null,
+      jidNumber: session?.jidNumber || null,
     });
   }
 }
