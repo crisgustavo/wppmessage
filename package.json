@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "build": "npx sucrase .src --out-dir .dist --transforms imports",
+    "pm2start": "pm2 start dist/server.js --name controle-whatsapp && pm2 startup && pm2 save",
+    "pm2stop": "pm2 stop controle-whatsapp",
+    "pm2delete": "pm2 delete controle-whatsapp",
+    "pm2restart": "pm2 restart controle-whatsapp"
   },
   "repository": {
     "type": "git",
