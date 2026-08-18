@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/server.js",
-    "build": "npx sucrase .src --out-dir .dist --transforms imports",
+    "build": "sucrase src -d dist --transforms imports",
+    "buildprod": "sucrase src -d dist --transforms imports --disableESTransforms && node -e \"require('fs').writeFileSync('dist/package.json', '{\\\"type\\\": \\\"commonjs\\\"}')\" --env NODE_ENV=PRODUCTION",
     "pm2start": "pm2 start dist/server.js --name controle-whatsapp && pm2 startup && pm2 save",
     "pm2stop": "pm2 stop controle-whatsapp",
     "pm2delete": "pm2 delete controle-whatsapp",

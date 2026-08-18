@@ -85,10 +85,7 @@ class SessionController {
         }
       });
 
-      // Evita logs enormes, não imprime nada das mensagens
-      sock.ev.on('messages.update', () => {
-        /* nada aqui */
-      });
+      sock.ev.on('messages.update', () => {});
 
       return session;
     } catch (err) {
@@ -126,7 +123,6 @@ class SessionController {
 
     return res.json({
       connected: session?.connected || false,
-      jid: session?.jid || null,
       hasQR: !!session?.qr,
       jidNumber: session?.jidNumber || null,
     });
